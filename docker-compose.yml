@@ -1,0 +1,60 @@
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  backend-service:
+    build:
+      context: ./backend-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: backend_app
+      SPRING_DATASOURCE_PASSWORD: ${BACKEND_DB_PASSWORD:?BACKEND_DB_PASSWORD must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  custom-api-gateway:
+    build:
+      context: ./custom-api-gateway
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: gateway_app
+      SPRING_DATASOURCE_PASSWORD: ${GATEWAY_DB_PASSWORD:?GATEWAY_DB_PASSWORD must be set}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      GATEWAY_ALLOWED_TARGETS: http://backend-service:8081
+      APP_ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-service:
+        condition: service_started
+
+volumes:
+  postgres-data:
