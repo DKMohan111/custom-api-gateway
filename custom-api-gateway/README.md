@@ -88,11 +88,11 @@ Configure the required environment variables before starting the applications.
 
 Check `src/main/resources/application.properties` and the parent Compose configuration for the exact settings and required environment variables.
 
-For Docker Compose, configure the required values in the parent project's `.env` file. The Compose setup maps `POSTGRES_PASSWORD` and `ADMIN_PASSWORD` to the relevant application configuration.
+For Docker Compose, configure the required values in the parent project's `.env` file. The Compose setup uses `POSTGRES_PASSWORD`, `BACKEND_DB_PASSWORD`, `GATEWAY_DB_PASSWORD`, and `ADMIN_PASSWORD` for the corresponding database and application configuration. Keep these values in the local `.env` file or deployment secret configuration; never commit them.
 
 The target allowlist must use the expected Spring configuration format. Allowed targets are matched by scheme, hostname, and effective port. Explicitly allowlisted targets bypass the validator's additional DNS/IP address checks, so only trusted destinations should be configured.
 
-**Security:** Never commit `.env` files, passwords, JWTs, or other secrets to version control. The application also initializes a development `testuser` account with a hardcoded password. Replace or remove these development credentials before production deployment.
+**Security:** Never commit `.env` files, passwords, JWTs, or other secrets to version control. The application initializes an `admin` account using the configured `APP_ADMIN_PASSWORD` value and stores its password as a BCrypt hash. Protect this configuration value and use a strong, unique password. The default or development credentials must not be used in production.
 
 ## Getting Started
 
