@@ -1,6 +1,9 @@
 
 package com.apigateway.service;
 
+import com.apigateway.exception.RateLimiterUnavailableException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -35,26 +38,27 @@ public class RateLimitService {
     }
 
     public RateLimitResult checkLimit(String username) {
-
         String key = "rate_limit:" + username;
 
-        Long count = redisTemplate.execute(
-                RATE_LIMIT_SCRIPT,
-                List.of(key),
-                String.valueOf(WINDOW.toMillis())
-        );
-
-        if (count == null) {
-            throw new IllegalStateException(
-                    "Redis did not return a rate-limit count"
+        try {
+            Long count = redisTemplate.execute(
+                    RATE_LIMIT_SCRIPT,
+                    List.of(key),
+                    String.valueOf(WINDOW.toMillis())
             );
+
+            if (count == null) {
+                throw new RateLimiterUnavailableException();
+            }
+
+            long remaining = Math.max(0, MAX_REQUESTS - count);
+
+            return new RateLimitResult(
+                    count <= MAX_REQUESTS,
+                    remaining
+            );
+        } catch (RedisConnectionFailureException | RedisSystemException exception) {
+            throw new RateLimiterUnavailableException();
         }
-
-        long remaining = Math.max(0, MAX_REQUESTS - count);
-
-        return new RateLimitResult(
-                count <= MAX_REQUESTS,
-                remaining
-        );
     }
 }

@@ -140,4 +140,16 @@ public class GlobalExceptionHandler {
                 request
         );
     }
+
+    @ExceptionHandler(RateLimiterUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimiterUnavailable(
+            RateLimiterUnavailableException exception,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Rate limiting service unavailable",
+                request
+        );
+    }
 }
