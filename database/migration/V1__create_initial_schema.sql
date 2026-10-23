@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     role VARCHAR(255) NOT NULL
 );
 
-GRANT CONNECT ON DATABASE postgres TO gateway_app, backend_app;
+GRANT CONNECT ON DATABASE custom_api_db TO gateway_app;
 GRANT USAGE ON SCHEMA public TO gateway_app, backend_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE
