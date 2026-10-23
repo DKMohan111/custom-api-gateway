@@ -1,0 +1,93 @@
+
+name: Java CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Create database roles
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5433 -U postgres -d postgres \
+            -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE gateway_app LOGIN PASSWORD 'ci-gateway-password';"
+
+          psql -h localhost -p 5433 -U postgres -d postgres \
+            -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE backend_app LOGIN PASSWORD 'ci-backend-password';"
+
+      - name: Initialize database schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5433 -U postgres -d postgres \
+            -v ON_ERROR_STOP=1 \
+            -f database/migration/V1__create_initial_schema.sql
+
+      - name: Test backend service
+        working-directory: backend-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/postgres
+          SPRING_DATASOURCE_USERNAME: backend_app
+          SPRING_DATASOURCE_PASSWORD: ci-backend-password
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
+
+      - name: Test custom API gateway
+        working-directory: custom-api-gateway
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/postgres
+          SPRING_DATASOURCE_USERNAME: gateway_app
+          SPRING_DATASOURCE_PASSWORD: ci-gateway-password
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+          JWT_SECRET: test-only-secret-key-that-is-at-least-32-bytes
+          APP_ADMIN_PASSWORD: test-admin-password
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
